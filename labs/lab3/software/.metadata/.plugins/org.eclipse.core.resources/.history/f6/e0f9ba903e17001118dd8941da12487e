@@ -1,0 +1,101 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <time.h>
+#include <sys/mman.h>
+#include <stdbool.h>
+#include <pthread.h>
+#include "hwlib.h"
+#include "socal/socal.h"
+#include "socal/hps.h"
+#include "socal/alt_gpio.h"
+#include "hps_0.h"
+#include "led.h"
+#include "seg7.h"
+
+#define LW_SIZE 0x00200000
+#define LWHPS2FPGA_BASE 0xff200000
+
+volatile uint32_t *h2p_lw_led_addr = NULL;
+volatile uint32_t *h2p_lw_sw_addr  = NULL;
+volatile uint32_t *h2p_lw_hex_addr = NULL;
+
+void led_blink(void){
+
+    printf("[MODE] LED startup lightshow\n");
+
+    for(int r=0; r<2; r++){
+        for(int i=0;i<=10;i++){
+            LEDR_LightCount(i);
+            usleep(100*1000);
+        }
+        for(int i=0;i<=10;i++){
+            LEDR_OffCount(i);
+            usleep(100*1000);
+        }
+    }
+
+    printf("[MODE] Switches mirror LEDs\n");
+    uint32_t prev = 0xFFFFFFFF;
+
+    while(1){
+        uint32_t sw = alt_read_word(h2p_lw_sw_addr) & 0x3FF; // 10 switches
+        alt_write_word(h2p_lw_led_addr, sw);
+
+        if(sw != prev){
+            printf("[STATE] SW=0x%03X -> LEDR updated\n", (unsigned)sw);
+            prev = sw;
+        }
+        usleep(10*1000);
+    }
+}
+
+int main(int argc, char **argv){
+    pthread_t id;
+    int ret;
+    void *virtual_base;
+    int fd;
+
+    // open the /dev/mem to access the FPGA space for reading and writing
+    if((fd = open("/dev/mem", (O_RDWR | O_SYNC))) == -1){
+        printf("ERROR: could not open \"/dev/mem\"...\n");
+        return 1;
+    }
+
+    //map virtual memory space to virtual_base, that is 2MB in size (0x00200000), at address WHPS2FPGA_BASE
+    virtual_base = mmap(NULL, LW_SIZE, (PROT_READ | PROT_WRITE), MAP_SHARED, fd, LWHPS2FPGA_BASE);
+
+    if(virtual_base == MAP_FAILED){
+        printf("ERROR: mmap() failed...\n");
+        close(fd);
+        return 1;
+    }
+
+    h2p_lw_led_addr = virtual_base + LED_PIO_BASE;     // base + 0x30
+    h2p_lw_hex_addr = virtual_base + SEG7_IF_0_BASE;   // base + 0x0
+    h2p_lw_sw_addr  = virtual_base + SWITCHES_PIO_BASE; // base + 0x20
+
+    ret = pthread_create(&id, NULL, (void *)led_blink, NULL);
+    if(ret != 0){
+        printf("Create pthread error!\n");
+        exit(1);
+    }
+
+    printf("[MODE] 7-seg startup hex count\n");
+    SEG7_All_Number();
+
+    printf("[MODE] 7-seg message display\n");
+    display_msg();
+
+    pthread_join(id, NULL);
+
+    if(munmap(virtual_base, LW_SIZE) != 0){
+        printf("ERROR: munmap() failed...\n");
+        close(fd);
+        return 1;
+    }
+
+    close(fd);
+    return 0;
+}

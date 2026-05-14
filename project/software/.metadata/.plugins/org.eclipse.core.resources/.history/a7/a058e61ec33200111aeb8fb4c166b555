@@ -1,0 +1,403 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <time.h>
+
+#include "hwlib.h"
+#include "socal/socal.h"
+#include "socal/hps.h"
+#include "socal/alt_gpio.h"
+#include "hps_0.h"
+
+/* =========================================================
+ * User configuration
+ * ========================================================= */
+#define MODE_SERIAL     0
+#define MODE_PARALLEL   1
+#define NUM_ENGINES     32
+
+/* LWH2F bridge */
+#define HW_REGS_BASE   ALT_STM_OFST
+#define HW_REGS_SPAN   0x04000000
+#define HW_REGS_MASK   (HW_REGS_SPAN - 1)
+
+/* Control slave offsets */
+#define MD5_CTRL_START   0x00
+#define MD5_CTRL_RESET   0x04
+#define MD5_CTRL_DONE    0x08
+
+/* Data slave offsets */
+#define MD5_DATA_WRITEDATA  0x00
+#define MD5_DATA_WRITEADDR  0x04
+#define MD5_DATA_WR         0x08
+#define MD5_DATA_READADDR   0x0C
+#define MD5_DATA_READDATA   0x10
+
+typedef struct {
+    uint32_t d[4];
+} md5_digest_words_t;
+
+typedef struct {
+    uint64_t total_hashes;
+    double elapsed_sec;
+    double hash_rate;
+} run_stats_t;
+
+/* =========================================================
+ * Time helpers
+ * ========================================================= */
+static double timespec_diff_sec(const struct timespec *start, const struct timespec *end)
+{
+    double s = (double)(end->tv_sec - start->tv_sec);
+    double ns = (double)(end->tv_nsec - start->tv_nsec) / 1e9;
+    return s + ns;
+}
+
+/* =========================================================
+ * Address helpers derived from md5_group hierarchy
+ * ========================================================= */
+static inline uint32_t make_writeaddr(uint32_t engine, uint32_t word_index)
+{
+    uint32_t unit = engine / 2;
+    uint32_t subengine = engine % 2;
+    return (unit << 5) | (subengine << 4) | (word_index & 0xF);
+}
+
+static inline uint32_t make_readaddr(uint32_t engine, uint32_t digest_word)
+{
+    return ((engine & 0x1F) << 2) | (digest_word & 0x3);
+}
+
+/* =========================================================
+ * Register helpers
+ * ========================================================= */
+static inline void reg_write(void *base, uint32_t offset, uint32_t value)
+{
+    alt_write_word((uint8_t *)base + offset, value);
+}
+
+static inline uint32_t reg_read(void *base, uint32_t offset)
+{
+    return alt_read_word((uint8_t *)base + offset);
+}
+
+static void pulse_reg(void *base, uint32_t offset, uint32_t value)
+{
+    reg_write(base, offset, value);
+    reg_write(base, offset, 0);
+}
+
+/* =========================================================
+ * MD5 control/data helpers
+ * ========================================================= */
+static void reset_engines(void *ctrl_base, uint32_t bitmask)
+{
+    pulse_reg(ctrl_base, MD5_CTRL_RESET, bitmask);
+}
+
+static void start_engines(void *ctrl_base, uint32_t bitmask)
+{
+    pulse_reg(ctrl_base, MD5_CTRL_START, bitmask);
+}
+
+static void load_message_to_engine(void *data_base, uint32_t engine, const uint32_t msg[16])
+{
+    int i;
+    for (i = 0; i < 16; i++) {
+        reg_write(data_base, MD5_DATA_WRITEDATA, msg[i]);
+        reg_write(data_base, MD5_DATA_WRITEADDR, make_writeaddr(engine, (uint32_t)i));
+        reg_write(data_base, MD5_DATA_WR, 1);
+        reg_write(data_base, MD5_DATA_WR, 0);
+    }
+}
+
+static void read_digest_from_engine(void *data_base, uint32_t engine, md5_digest_words_t *digest)
+{
+    int i;
+    for (i = 0; i < 4; i++) {
+        reg_write(data_base, MD5_DATA_READADDR, make_readaddr(engine, (uint32_t)i));
+        digest->d[i] = reg_read(data_base, MD5_DATA_READDATA);
+    }
+}
+
+static uint32_t wait_for_done_mask(void *ctrl_base, uint32_t required_mask, double timeout_sec)
+{
+    uint32_t done_val;
+    struct timespec t0, t1;
+    double elapsed;
+
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    do {
+        done_val = reg_read(ctrl_base, MD5_CTRL_DONE);
+
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        elapsed = timespec_diff_sec(&t0, &t1);
+
+        if (elapsed >= timeout_sec) {
+            printf("TIMEOUT waiting for done mask 0x%08x\n", required_mask);
+            printf("Current done value = 0x%08x\n", done_val);
+            printf("Elapsed wait time  = %.6f s\n", elapsed);
+            return done_val;
+        }
+
+    } while ((done_val & required_mask) != required_mask);
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    elapsed = timespec_diff_sec(&t0, &t1);
+
+    printf("Done detected for mask 0x%08x\n", required_mask);
+    printf("Done value         = 0x%08x\n", done_val);
+    printf("Wait time          = %.6f s\n", elapsed);
+
+    return done_val;
+}
+
+/* =========================================================
+ * Message generation
+ * ========================================================= */
+static void build_message_for_engine(uint32_t engine, uint64_t iter, uint32_t msg[16])
+{
+    int i;
+    for (i = 0; i < 16; i++) {
+        msg[i] = (uint32_t)(0x1000u * engine + 0x10u * (uint32_t)iter + (uint32_t)i);
+    }
+}
+
+static void print_digest(const char *label, const md5_digest_words_t *d)
+{
+    printf("%s D0=0x%08x D1=0x%08x D2=0x%08x D3=0x%08x\n",
+           label, d->d[0], d->d[1], d->d[2], d->d[3]);
+}
+
+/* =========================================================
+ * Quick register readback test
+ * ========================================================= */
+static void debug_register_readback(void *ctrl_base, void *data_base)
+{
+    printf("Testing control/data slave readback...\n");
+
+    reg_write(ctrl_base, MD5_CTRL_START, 0x00000001);
+    printf("CTRL START readback   = 0x%08x\n", reg_read(ctrl_base, MD5_CTRL_START));
+
+    reg_write(ctrl_base, MD5_CTRL_RESET, 0x00000001);
+    printf("CTRL RESET readback   = 0x%08x\n", reg_read(ctrl_base, MD5_CTRL_RESET));
+
+    reg_write(data_base, MD5_DATA_WRITEDATA, 0x12345678);
+    printf("DATA WRITEDATA        = 0x%08x\n", reg_read(data_base, MD5_DATA_WRITEDATA));
+
+    reg_write(data_base, MD5_DATA_WRITEADDR, 0x00000015);
+    printf("DATA WRITEADDR        = 0x%08x\n", reg_read(data_base, MD5_DATA_WRITEADDR));
+
+    printf("Initial DONE          = 0x%08x\n", reg_read(ctrl_base, MD5_CTRL_DONE));
+}
+
+/* =========================================================
+ * Serial benchmark
+ * ========================================================= */
+static void run_serial_mode(void *ctrl_base, void *data_base, run_stats_t *stats, int duration_seconds)
+{
+    struct timespec t0, t1;
+    uint64_t total_hashes = 0;
+    uint64_t iter = 0;
+
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    while (1) {
+        double elapsed_now;
+        uint32_t engine;
+
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        elapsed_now = timespec_diff_sec(&t0, &t1);
+        if (elapsed_now >= duration_seconds) {
+            break;
+        }
+
+        for (engine = 0; engine < NUM_ENGINES; engine++) {
+            uint32_t msg[16];
+            md5_digest_words_t hw_digest;
+
+            build_message_for_engine(engine, iter, msg);
+
+            reset_engines(ctrl_base, (1u << engine));
+            load_message_to_engine(data_base, engine, msg);
+            start_engines(ctrl_base, (1u << engine));
+
+            printf("Waiting for engine %u done...\n", engine);
+            wait_for_done_mask(ctrl_base, (1u << engine, 2.0));
+
+            read_digest_from_engine(data_base, engine, &hw_digest);
+
+            total_hashes++;
+
+            if (iter < 2 && engine < 2) {
+                printf("[SERIAL] iter=%llu engine=%u\n",
+                       (unsigned long long)iter, engine);
+                print_digest("  HW :", &hw_digest);
+            }
+
+            clock_gettime(CLOCK_MONOTONIC, &t1);
+            elapsed_now = timespec_diff_sec(&t0, &t1);
+            if (elapsed_now >= duration_seconds) {
+                break;
+            }
+        }
+
+        iter++;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
+    stats->total_hashes = total_hashes;
+    stats->elapsed_sec = timespec_diff_sec(&t0, &t1);
+    stats->hash_rate = (stats->elapsed_sec > 0.0) ? ((double)total_hashes / stats->elapsed_sec) : 0.0;
+}
+
+/* =========================================================
+ * Parallel benchmark
+ * ========================================================= */
+static void run_parallel_mode(void *ctrl_base, void *data_base, run_stats_t *stats, int duration_seconds)
+{
+    struct timespec t0, t1;
+    uint64_t total_hashes = 0;
+    uint64_t iter = 0;
+
+    /* Safer first live test: engines 0 and 1 only */
+    uint32_t full_mask = 0x00000003u;
+
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    while (1) {
+        double elapsed_now;
+        uint32_t engine;
+        uint32_t msg[NUM_ENGINES][16];
+        md5_digest_words_t hw[NUM_ENGINES];
+
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        elapsed_now = timespec_diff_sec(&t0, &t1);
+        if (elapsed_now >= duration_seconds) {
+            break;
+        }
+
+        for (engine = 0; engine < 2; engine++) {
+            build_message_for_engine(engine, iter, msg[engine]);
+        }
+
+        reset_engines(ctrl_base, full_mask);
+
+        for (engine = 0; engine < 2; engine++) {
+            load_message_to_engine(data_base, engine, msg[engine]);
+        }
+
+        start_engines(ctrl_base, full_mask);
+
+        printf("Waiting for parallel done mask = 0x%08x\n", full_mask);
+        wait_for_done_mask(ctrl_base, full_mask);
+
+        for (engine = 0; engine < 2; engine++) {
+            read_digest_from_engine(data_base, engine, &hw[engine]);
+            total_hashes++;
+
+            if (iter < 1) {
+                printf("[PARALLEL] iter=%llu engine=%u\n",
+                       (unsigned long long)iter, engine);
+                print_digest("  HW :", &hw[engine]);
+            }
+        }
+
+        iter++;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
+    stats->total_hashes = total_hashes;
+    stats->elapsed_sec = timespec_diff_sec(&t0, &t1);
+    stats->hash_rate = (stats->elapsed_sec > 0.0) ? ((double)total_hashes / stats->elapsed_sec) : 0.0;
+}
+
+/* =========================================================
+ * Main
+ * ========================================================= */
+int main(void)
+{
+    int fd;
+    void *virtual_base;
+    void *ctrl_base;
+    void *data_base;
+    run_stats_t stats;
+    int run_mode;
+    int duration_seconds;
+
+    setbuf(stdout, NULL);
+    memset(&stats, 0, sizeof(stats));
+
+    printf("========== MD5 HPS/FPGA TEST ==========\n");
+    printf("Select mode:\n");
+    printf("  0 - Serial\n");
+    printf("  1 - Parallel\n");
+    printf("Enter mode: ");
+    scanf("%d", &run_mode);
+
+    printf("Enter test duration in seconds: ");
+    scanf("%d", &duration_seconds);
+
+    if ((run_mode != MODE_SERIAL) && (run_mode != MODE_PARALLEL)) {
+        printf("Invalid mode selected. Defaulting to SERIAL.\n");
+        run_mode = MODE_SERIAL;
+    }
+
+    if (duration_seconds <= 0) {
+        printf("Invalid duration. Defaulting to 5 seconds.\n");
+        duration_seconds = 5;
+    }
+
+    printf("Opening /dev/mem...\n");
+    fd = open("/dev/mem", O_RDWR | O_SYNC);
+    if (fd < 0) {
+        perror("open /dev/mem");
+        return 1;
+    }
+
+    printf("Mapping lightweight bridge...\n");
+    virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE, MAP_SHARED, fd, HW_REGS_BASE);
+    if (virtual_base == MAP_FAILED) {
+        perror("mmap");
+        close(fd);
+        return 1;
+    }
+
+    ctrl_base = (uint8_t *)virtual_base +
+        ((unsigned long)MD5_CONTROL_SLAVE_0_BASE & HW_REGS_MASK);
+
+    data_base = (uint8_t *)virtual_base +
+        ((unsigned long)MD5_DATA_SLAVE_0_BASE & HW_REGS_MASK);
+
+    debug_register_readback(ctrl_base, data_base);
+
+    if (run_mode == MODE_SERIAL) {
+        printf("\n========== MD5 SERIAL MODE ==========\n");
+        run_serial_mode(ctrl_base, data_base, &stats, duration_seconds);
+    } else {
+        printf("\n========== MD5 PARALLEL MODE ==========\n");
+        run_parallel_mode(ctrl_base, data_base, &stats, duration_seconds);
+    }
+
+    printf("\n========== FINAL STATS ==========\n");
+    printf("Total hashes   : %llu\n", (unsigned long long)stats.total_hashes);
+    printf("Execution time : %.6f s\n", stats.elapsed_sec);
+    printf("Hash rate      : %.3f hashes/s\n", stats.hash_rate);
+    printf("Correctness    : N/A (software digest check removed)\n");
+
+    if (munmap(virtual_base, HW_REGS_SPAN) != 0) {
+        perror("munmap");
+    }
+
+    close(fd);
+    return 0;
+}
+
+

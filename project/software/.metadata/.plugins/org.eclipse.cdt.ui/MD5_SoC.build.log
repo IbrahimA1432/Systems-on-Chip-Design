@@ -1,0 +1,13 @@
+14:49:01 **** Incremental Build of configuration Debug for project MD5_SoC ****
+make all 
+Building file: ../software/main.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/main.d" -MT"software/main.d" -o "software/main.o" "../software/main.c"
+../software/main.c: In function ‘main’:
+../software/main.c:502:25: error: ‘MD5_CONTROL_SLAVE_0_BASE’ undeclared (first use in this function)
+../software/main.c:502:25: note: each undeclared identifier is reported only once for each function it appears in
+../software/main.c:505:25: error: ‘MD5_DATA_SLAVE_0_BASE’ undeclared (first use in this function)
+make: *** [software/main.o] Error 1
+
+14:49:01 Build Finished (took 206ms)
+

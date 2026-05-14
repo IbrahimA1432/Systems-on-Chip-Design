@@ -1,0 +1,25 @@
+# system info soc_system on 2026.04.07.01:46:59
+system_info:
+name,value
+DEVICE,5CSEMA5F31C6
+DEVICE_FAMILY,Cyclone V
+GENERATION_ID,1775540812
+#
+#
+# Files generated for soc_system on 2026.04.07.01:46:59
+files:
+filepath,kind,attributes,module,is_top
+simulation/soc_system.vhd,VHDL,,soc_system,true
+simulation/submodules/soc_system_hps_0.v,VERILOG,,soc_system_hps_0,false
+#
+# Map from instance-path to kind of module
+instances:
+instancePath,module
+soc_system.hps_0,soc_system_hps_0
+soc_system.hps_0.fpga_interfaces,soc_system_hps_0_fpga_interfaces
+soc_system.hps_0.hps_io,soc_system_hps_0_hps_io
+soc_system.md5_control_slave_0,soc_system_md5_control_slave_0
+soc_system.md5_data_slave_0,soc_system_md5_data_slave_0
+soc_system.mm_interconnect_0,soc_system_mm_interconnect_0
+soc_system.rst_controller,altera_reset_controller
+soc_system.rst_controller_001,altera_reset_controller

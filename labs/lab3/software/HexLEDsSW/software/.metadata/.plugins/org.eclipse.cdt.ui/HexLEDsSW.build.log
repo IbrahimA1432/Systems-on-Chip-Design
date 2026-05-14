@@ -1,0 +1,10 @@
+00:14:13 **** Incremental Build of configuration Debug for project HexLEDsSW ****
+make all 
+Building target: HexLEDsSW
+Invoking: GCC C Linker
+arm-linux-gnueabihf-gcc  -o "HexLEDsSW"  ./software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/led.o ./software/main.o ./software/seg7.o   -lpthread -lm -lrt
+Finished building target: HexLEDsSW
+ 
+
+00:14:13 Build Finished (took 308ms)
+

@@ -1,0 +1,532 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <time.h>
+
+#include "hwlib.h"
+#include "socal/socal.h"
+#include "socal/hps.h"
+#include "socal/alt_gpio.h"
+#include "hps_0.h"
+
+/* =========================================================
+ * User configuration
+ * ========================================================= */
+#define MODE_SERIAL     0
+#define MODE_PARALLEL   1
+
+#define TEST_DURATION_SECONDS 5
+#define NUM_ENGINES 32
+
+/* LWH2F bridge */
+#define HW_REGS_BASE   ALT_STM_OFST
+#define HW_REGS_SPAN   0x04000000
+#define HW_REGS_MASK   (HW_REGS_SPAN - 1)
+
+/* Control slave offsets */
+#define MD5_CTRL_START   0x00
+#define MD5_CTRL_RESET   0x04
+#define MD5_CTRL_DONE    0x08
+
+/* Data slave offsets */
+#define MD5_DATA_WRITEDATA  0x00
+#define MD5_DATA_WRITEADDR  0x04
+#define MD5_DATA_WR         0x08
+#define MD5_DATA_READADDR   0x0C
+#define MD5_DATA_READDATA   0x10
+
+/* =========================================================
+ * Utility structures
+ * ========================================================= */
+typedef struct {
+    uint32_t d[4];
+} md5_digest_words_t;
+
+typedef struct {
+    uint64_t total_hashes;
+    uint64_t correct_hashes;
+    double elapsed_sec;
+    double hash_rate;
+} run_stats_t;
+
+/* =========================================================
+ * Small software MD5 reference
+ * Only supports one 64-byte block input, which is exactly
+ * what this lab uses: 16 words = 64 bytes.
+ * ========================================================= */
+#define MD5_F(x,y,z) (((x) & (y)) | ((~(x)) & (z)))
+#define MD5_G(x,y,z) (((x) & (z)) | ((y) & (~(z))))
+#define MD5_H(x,y,z) ((x) ^ (y) ^ (z))
+#define MD5_I(x,y,z) ((y) ^ ((x) | (~(z))))
+#define MD5_LEFTROTATE(x,c) (((x) << (c)) | ((x) >> (32 - (c))))
+
+static const uint32_t md5_k[64] = {
+    0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
+    0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+    0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
+    0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+    0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa,
+    0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+    0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed,
+    0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+    0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
+    0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+    0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05,
+    0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+    0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039,
+    0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+    0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
+    0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
+};
+
+static const uint32_t md5_r[64] = {
+    7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
+    5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,
+    4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,
+    6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21
+};
+
+static void md5_single_block_64bytes(const uint8_t block[64], uint8_t digest[16])
+{
+    uint32_t a0 = 0x67452301;
+    uint32_t b0 = 0xefcdab89;
+    uint32_t c0 = 0x98badcfe;
+    uint32_t d0 = 0x10325476;
+
+    uint8_t padded[128];
+    uint32_t m[16];
+    uint64_t bit_len = 64ULL * 8ULL;
+    int i;
+    int blk;
+
+    memset(padded, 0, sizeof(padded));
+    memcpy(padded, block, 64);
+
+    padded[64] = 0x80;
+
+    for (i = 0; i < 8; i++) {
+        padded[120 + i] = (uint8_t)((bit_len >> (8 * i)) & 0xFF);
+    }
+
+    for (blk = 0; blk < 2; blk++) {
+        const uint8_t *chunk = &padded[blk * 64];
+        uint32_t A = a0;
+        uint32_t B = b0;
+        uint32_t C = c0;
+        uint32_t D = d0;
+
+        for (i = 0; i < 16; i++) {
+            m[i] =  ((uint32_t)chunk[4*i + 0] << 0)
+                  | ((uint32_t)chunk[4*i + 1] << 8)
+                  | ((uint32_t)chunk[4*i + 2] << 16)
+                  | ((uint32_t)chunk[4*i + 3] << 24);
+        }
+
+        for (i = 0; i < 64; i++) {
+            uint32_t f, g;
+            uint32_t temp;
+
+            if (i < 16) {
+                f = MD5_F(B, C, D);
+                g = (uint32_t)i;
+            } else if (i < 32) {
+                f = MD5_G(B, C, D);
+                g = (uint32_t)((5 * i + 1) % 16);
+            } else if (i < 48) {
+                f = MD5_H(B, C, D);
+                g = (uint32_t)((3 * i + 5) % 16);
+            } else {
+                f = MD5_I(B, C, D);
+                g = (uint32_t)((7 * i) % 16);
+            }
+
+            temp = D;
+            D = C;
+            C = B;
+            B = B + MD5_LEFTROTATE(A + f + md5_k[i] + m[g], md5_r[i]);
+            A = temp;
+        }
+
+        a0 += A;
+        b0 += B;
+        c0 += C;
+        d0 += D;
+    }
+
+    digest[0]  = (uint8_t)((a0 >> 0)  & 0xFF);
+    digest[1]  = (uint8_t)((a0 >> 8)  & 0xFF);
+    digest[2]  = (uint8_t)((a0 >> 16) & 0xFF);
+    digest[3]  = (uint8_t)((a0 >> 24) & 0xFF);
+
+    digest[4]  = (uint8_t)((b0 >> 0)  & 0xFF);
+    digest[5]  = (uint8_t)((b0 >> 8)  & 0xFF);
+    digest[6]  = (uint8_t)((b0 >> 16) & 0xFF);
+    digest[7]  = (uint8_t)((b0 >> 24) & 0xFF);
+
+    digest[8]  = (uint8_t)((c0 >> 0)  & 0xFF);
+    digest[9]  = (uint8_t)((c0 >> 8)  & 0xFF);
+    digest[10] = (uint8_t)((c0 >> 16) & 0xFF);
+    digest[11] = (uint8_t)((c0 >> 24) & 0xFF);
+
+    digest[12] = (uint8_t)((d0 >> 0)  & 0xFF);
+    digest[13] = (uint8_t)((d0 >> 8)  & 0xFF);
+    digest[14] = (uint8_t)((d0 >> 16) & 0xFF);
+    digest[15] = (uint8_t)((d0 >> 24) & 0xFF);
+}
+
+/* =========================================================
+ * Time helpers
+ * ========================================================= */
+static double timespec_diff_sec(const struct timespec *start, const struct timespec *end)
+{
+    double s = (double)(end->tv_sec - start->tv_sec);
+    double ns = (double)(end->tv_nsec - start->tv_nsec) / 1e9;
+    return s + ns;
+}
+
+/* =========================================================
+ * Address helpers derived from md5_group hierarchy
+ * ========================================================= */
+static inline uint32_t make_writeaddr(uint32_t engine, uint32_t word_index)
+{
+    uint32_t unit = engine / 2;
+    uint32_t subengine = engine % 2;
+    return (unit << 5) | (subengine << 4) | (word_index & 0xF);
+}
+
+static inline uint32_t make_readaddr(uint32_t engine, uint32_t digest_word)
+{
+    return ((engine & 0x1F) << 2) | (digest_word & 0x3);
+}
+
+/* =========================================================
+ * Register helpers
+ * ========================================================= */
+static inline void reg_write(void *base, uint32_t offset, uint32_t value)
+{
+    alt_write_word((uint8_t *)base + offset, value);
+}
+
+static inline uint32_t reg_read(void *base, uint32_t offset)
+{
+    return alt_read_word((uint8_t *)base + offset);
+}
+
+static void pulse_reg(void *base, uint32_t offset, uint32_t value)
+{
+    reg_write(base, offset, value);
+    reg_write(base, offset, 0);
+}
+
+/* =========================================================
+ * MD5 control/data helpers
+ * ========================================================= */
+static void reset_engines(void *ctrl_base, uint32_t bitmask)
+{
+    pulse_reg(ctrl_base, MD5_CTRL_RESET, bitmask);
+}
+
+static void start_engines(void *ctrl_base, uint32_t bitmask)
+{
+    pulse_reg(ctrl_base, MD5_CTRL_START, bitmask);
+}
+
+static void load_message_to_engine(void *data_base, uint32_t engine, const uint32_t msg[16])
+{
+    int i;
+    for (i = 0; i < 16; i++) {
+        reg_write(data_base, MD5_DATA_WRITEDATA, msg[i]);
+        reg_write(data_base, MD5_DATA_WRITEADDR, make_writeaddr(engine, (uint32_t)i));
+        reg_write(data_base, MD5_DATA_WR, 1);
+        reg_write(data_base, MD5_DATA_WR, 0);
+    }
+}
+
+static void read_digest_from_engine(void *data_base, uint32_t engine, md5_digest_words_t *digest)
+{
+    int i;
+    for (i = 0; i < 4; i++) {
+        reg_write(data_base, MD5_DATA_READADDR, make_readaddr(engine, (uint32_t)i));
+        digest->d[i] = reg_read(data_base, MD5_DATA_READDATA);
+    }
+}
+
+static uint32_t wait_for_done_mask(void *ctrl_base, uint32_t required_mask)
+{
+    uint32_t done_val;
+    do {
+        done_val = reg_read(ctrl_base, MD5_CTRL_DONE);
+    } while ((done_val & required_mask) != required_mask);
+    return done_val;
+}
+
+/* =========================================================
+ * Message generation and expected digest
+ * ========================================================= */
+static void build_message_for_engine(uint32_t engine, uint64_t iter, uint32_t msg[16])
+{
+    int i;
+    for (i = 0; i < 16; i++) {
+        msg[i] = (uint32_t)(0x1000u * engine + 0x10u * (uint32_t)iter + (uint32_t)i);
+    }
+}
+
+static void compute_expected_digest(const uint32_t msg[16], md5_digest_words_t *expected)
+{
+    uint8_t bytes[64];
+    uint8_t digest_bytes[16];
+    int i;
+
+    for (i = 0; i < 16; i++) {
+        bytes[4*i + 0] = (uint8_t)((msg[i] >> 0)  & 0xFF);
+        bytes[4*i + 1] = (uint8_t)((msg[i] >> 8)  & 0xFF);
+        bytes[4*i + 2] = (uint8_t)((msg[i] >> 16) & 0xFF);
+        bytes[4*i + 3] = (uint8_t)((msg[i] >> 24) & 0xFF);
+    }
+
+    md5_single_block_64bytes(bytes, digest_bytes);
+
+    for (i = 0; i < 4; i++) {
+        expected->d[i] =
+            ((uint32_t)digest_bytes[4*i + 0] << 0)  |
+            ((uint32_t)digest_bytes[4*i + 1] << 8)  |
+            ((uint32_t)digest_bytes[4*i + 2] << 16) |
+            ((uint32_t)digest_bytes[4*i + 3] << 24);
+    }
+}
+
+static bool digest_equal(const md5_digest_words_t *a, const md5_digest_words_t *b)
+{
+    return (a->d[0] == b->d[0] &&
+            a->d[1] == b->d[1] &&
+            a->d[2] == b->d[2] &&
+            a->d[3] == b->d[3]);
+}
+
+static void print_digest(const char *label, const md5_digest_words_t *d)
+{
+    printf("%s D0=0x%08x D1=0x%08x D2=0x%08x D3=0x%08x\n",
+           label, d->d[0], d->d[1], d->d[2], d->d[3]);
+}
+
+/* =========================================================
+ * Serial benchmark
+ * ========================================================= */
+static void run_serial_mode(void *ctrl_base, void *data_base, run_stats_t *stats)
+{
+    struct timespec t0, t1;
+    uint64_t total_hashes = 0;
+    uint64_t correct_hashes = 0;
+    uint64_t iter = 0;
+
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    while (1) {
+        double elapsed_now;
+        uint32_t engine;
+
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        elapsed_now = timespec_diff_sec(&t0, &t1);
+        if (elapsed_now >= TEST_DURATION_SECONDS) {
+            break;
+        }
+
+        for (engine = 0; engine < NUM_ENGINES; engine++) {
+            uint32_t msg[16];
+            md5_digest_words_t hw_digest;
+            md5_digest_words_t expected_digest;
+            bool ok;
+
+            build_message_for_engine(engine, iter, msg);
+            compute_expected_digest(msg, &expected_digest);
+
+            reset_engines(ctrl_base, (1u << engine));
+            load_message_to_engine(data_base, engine, msg);
+            start_engines(ctrl_base, (1u << engine));
+            wait_for_done_mask(ctrl_base, (1u << engine));
+            read_digest_from_engine(data_base, engine, &hw_digest);
+
+            ok = digest_equal(&hw_digest, &expected_digest);
+
+            total_hashes++;
+            if (ok) {
+                correct_hashes++;
+            }
+
+            if (iter < 2 && engine < 2) {
+                printf("[SERIAL] iter=%llu engine=%u\n",
+                       (unsigned long long)iter, engine);
+                print_digest("  HW     :", &hw_digest);
+                print_digest("  EXPECT :", &expected_digest);
+                printf("  RESULT : %s\n", ok ? "PASS" : "FAIL");
+            }
+
+            clock_gettime(CLOCK_MONOTONIC, &t1);
+            elapsed_now = timespec_diff_sec(&t0, &t1);
+            if (elapsed_now >= TEST_DURATION_SECONDS) {
+                break;
+            }
+        }
+
+        iter++;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
+    stats->total_hashes = total_hashes;
+    stats->correct_hashes = correct_hashes;
+    stats->elapsed_sec = timespec_diff_sec(&t0, &t1);
+    stats->hash_rate = (stats->elapsed_sec > 0.0) ? ((double)total_hashes / stats->elapsed_sec) : 0.0;
+}
+
+/* =========================================================
+ * Parallel benchmark
+ * ========================================================= */
+static void run_parallel_mode(void *ctrl_base, void *data_base, run_stats_t *stats)
+{
+    struct timespec t0, t1;
+    uint64_t total_hashes = 0;
+    uint64_t correct_hashes = 0;
+    uint64_t iter = 0;
+    uint32_t full_mask = 0xFFFFFFFFu;
+
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    while (1) {
+        double elapsed_now;
+        uint32_t engine;
+        uint32_t msg[NUM_ENGINES][16];
+        md5_digest_words_t expected[NUM_ENGINES];
+        md5_digest_words_t hw[NUM_ENGINES];
+
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        elapsed_now = timespec_diff_sec(&t0, &t1);
+        if (elapsed_now >= TEST_DURATION_SECONDS) {
+            break;
+        }
+
+        for (engine = 0; engine < NUM_ENGINES; engine++) {
+            build_message_for_engine(engine, iter, msg[engine]);
+            compute_expected_digest(msg[engine], &expected[engine]);
+        }
+
+        reset_engines(ctrl_base, full_mask);
+
+        for (engine = 0; engine < NUM_ENGINES; engine++) {
+            load_message_to_engine(data_base, engine, msg[engine]);
+        }
+
+        start_engines(ctrl_base, full_mask);
+        wait_for_done_mask(ctrl_base, full_mask);
+
+        for (engine = 0; engine < NUM_ENGINES; engine++) {
+            bool ok;
+            read_digest_from_engine(data_base, engine, &hw[engine]);
+            ok = digest_equal(&hw[engine], &expected[engine]);
+
+            total_hashes++;
+            if (ok) {
+                correct_hashes++;
+            }
+
+            if (iter < 1 && engine < 2) {
+                printf("[PARALLEL] iter=%llu engine=%u\n",
+                       (unsigned long long)iter, engine);
+                print_digest("  HW     :", &hw[engine]);
+                print_digest("  EXPECT :", &expected[engine]);
+                printf("  RESULT : %s\n", ok ? "PASS" : "FAIL");
+            }
+        }
+
+        iter++;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
+    stats->total_hashes = total_hashes;
+    stats->correct_hashes = correct_hashes;
+    stats->elapsed_sec = timespec_diff_sec(&t0, &t1);
+    stats->hash_rate = (stats->elapsed_sec > 0.0) ? ((double)total_hashes / stats->elapsed_sec) : 0.0;
+}
+
+/* =========================================================
+ * Main
+ * ========================================================= */
+int main(int argc, char *argv[])
+{
+    int fd;
+    void *virtual_base;
+    void *ctrl_base;
+    void *data_base;
+    run_stats_t stats;
+    int run_mode = MODE_SERIAL;
+
+    memset(&stats, 0, sizeof(stats));
+
+    if (argc >= 2) {
+        if ((strcmp(argv[1], "serial") == 0) || (strcmp(argv[1], "s") == 0)) {
+            run_mode = MODE_SERIAL;
+        } else if ((strcmp(argv[1], "parallel") == 0) || (strcmp(argv[1], "p") == 0)) {
+            run_mode = MODE_PARALLEL;
+        } else {
+            printf("Usage: %s [serial|parallel]\n", argv[0]);
+            printf("Examples:\n");
+            printf("  %s serial\n", argv[0]);
+            printf("  %s parallel\n", argv[0]);
+            return 1;
+        }
+    } else {
+        printf("No mode specified. Defaulting to SERIAL mode.\n");
+    }
+
+    printf("Opening /dev/mem...\n");
+    fd = open("/dev/mem", O_RDWR | O_SYNC);
+    if (fd < 0) {
+        perror("open /dev/mem");
+        return 1;
+    }
+
+    printf("Mapping lightweight bridge...\n");
+    virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE, MAP_SHARED, fd, HW_REGS_BASE);
+    if (virtual_base == MAP_FAILED) {
+        perror("mmap");
+        close(fd);
+        return 1;
+    }
+
+    ctrl_base = (uint8_t *)virtual_base +
+        ((unsigned long)MD5_CONTROL_SLAVE_0_BASE & HW_REGS_MASK);
+
+    data_base = (uint8_t *)virtual_base +
+        ((unsigned long)MD5_DATA_SLAVE_0_BASE & HW_REGS_MASK);
+
+    if (run_mode == MODE_SERIAL) {
+        printf("\n========== MD5 SERIAL MODE ==========\n");
+        run_serial_mode(ctrl_base, data_base, &stats);
+    } else {
+        printf("\n========== MD5 PARALLEL MODE ==========\n");
+        run_parallel_mode(ctrl_base, data_base, &stats);
+    }
+
+    printf("\n========== FINAL STATS ==========\n");
+    printf("Total hashes   : %llu\n", (unsigned long long)stats.total_hashes);
+    printf("Correct hashes : %llu\n", (unsigned long long)stats.correct_hashes);
+    printf("Execution time : %.6f s\n", stats.elapsed_sec);
+    printf("Hash rate      : %.3f hashes/s\n", stats.hash_rate);
+
+    if (stats.total_hashes > 0) {
+        double pct = 100.0 * ((double)stats.correct_hashes / (double)stats.total_hashes);
+        printf("Correctness    : %.2f%%\n", pct);
+    }
+
+    if (munmap(virtual_base, HW_REGS_SPAN) != 0) {
+        perror("munmap");
+    }
+
+    close(fd);
+    return 0;
+}

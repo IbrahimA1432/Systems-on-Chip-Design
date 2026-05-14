@@ -1,0 +1,155 @@
+$date
+     Jan 27, 2026       16:37:03
+$end
+
+$version
+              SystemC 2.3.0-ASI --- Sep 10 2012 16:44:06
+$end
+
+$timescale
+     1 ns
+$end
+
+$scope module SystemC $end
+$var wire    1  aaa  clk       $end
+$var wire    8  aab  A [7:0]  $end
+$var wire    8  aac  B [7:0]  $end
+$var wire    1  aad  en       $end
+$var wire    1  aae  l_r       $end
+$var wire    5  aaf  shift_amt [4:0]  $end
+$var wire    1  aag  op       $end
+$var wire    8  aah  B_shifted [7:0]  $end
+$var wire    8  aai  Y [7:0]  $end
+$upscope $end
+$enddefinitions  $end
+
+$comment
+All initial values are dumped below at time 0 sec = 0 timescale units.
+$end
+
+$dumpvars
+1aaa
+b0 aab
+b0 aac
+0aad
+0aae
+b0 aaf
+1aag
+b0 aah
+b0 aai
+$end
+
+#5
+0aaa
+
+#10
+1aaa
+
+#15
+0aaa
+
+#20
+1aaa
+b10100 aab
+b11 aac
+b11 aah
+b10100 aai
+
+#25
+0aaa
+
+#30
+1aaa
+b10111 aai
+
+#35
+0aaa
+
+#40
+1aaa
+0aag
+b10001 aai
+
+#45
+0aaa
+
+#50
+1aaa
+
+#55
+0aaa
+
+#60
+1aaa
+b1010 aab
+b101 aac
+1aad
+b1 aaf
+1aag
+b1010 aah
+b1101 aai
+
+#65
+0aaa
+
+#70
+1aaa
+b10100 aai
+
+#75
+0aaa
+
+#80
+1aaa
+b10 aaf
+0aag
+b10100 aah
+b0 aai
+
+#85
+0aaa
+
+#90
+1aaa
+b11110110 aai
+
+#95
+0aaa
+
+#100
+1aaa
+b10000 aab
+b100000 aac
+1aae
+b1 aaf
+1aag
+b10000 aah
+b100100 aai
+
+#105
+0aaa
+
+#110
+1aaa
+b100000 aai
+
+#115
+0aaa
+
+#120
+1aaa
+b11 aaf
+0aag
+b100 aah
+b0 aai
+
+#125
+0aaa
+
+#130
+1aaa
+b1100 aai
+
+#135
+0aaa
+

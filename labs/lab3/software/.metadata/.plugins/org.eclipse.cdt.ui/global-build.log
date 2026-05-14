@@ -1,0 +1,135 @@
+15:28:23 **** Incremental Build of configuration Debug for project HexLEDsSW ****
+make all 
+Building target: HexLEDsSW
+Invoking: GCC C Linker
+arm-linux-gnueabihf-gcc  -o "HexLEDsSW"  ./software/HexLEDsSW/software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/HexLEDsSW/software/led.o ./software/HexLEDsSW/software/main.o ./software/HexLEDsSW/software/seg7.o  ./software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/led.o ./software/main.o ./software/seg7.o   -lpthread -lm -lrt
+./software/led.o: In function `LEDR_LightCount':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/led.c:16: multiple definition of `LEDR_LightCount'
+./software/HexLEDsSW/software/led.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/led.c:16: first defined here
+./software/led.o: In function `LEDR_OffCount':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/led.c:27: multiple definition of `LEDR_OffCount'
+./software/HexLEDsSW/software/led.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/led.c:27: first defined here
+./software/led.o: In function `LEDR_AllOn':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/led.c:37: multiple definition of `LEDR_AllOn'
+./software/HexLEDsSW/software/led.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/led.c:37: first defined here
+./software/led.o: In function `LEDR_AllOff':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/led.c:43: multiple definition of `LEDR_AllOff'
+./software/HexLEDsSW/software/led.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/led.c:43: first defined here
+./software/main.o: In function `led_blink':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:24: multiple definition of `h2p_lw_led_addr'
+./software/HexLEDsSW/software/main.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/main.c:30: first defined here
+./software/main.o: In function `led_blink':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:25: multiple definition of `h2p_lw_hex_addr'
+./software/HexLEDsSW/software/main.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/main.c:30: first defined here
+./software/main.o: In function `led_blink':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:24: multiple definition of `led_blink'
+./software/HexLEDsSW/software/main.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/main.c:30: first defined here
+./software/main.o: In function `main':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:56: multiple definition of `main'
+./software/HexLEDsSW/software/main.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/main.c:51: first defined here
+./software/seg7.o: In function `display_msg':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:28: multiple definition of `display_msg'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:30: first defined here
+./software/seg7.o: In function `SEG7_Clear':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:37: multiple definition of `SEG7_Clear'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:39: first defined here
+./software/seg7.o: In function `SEG7_Full':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:44: multiple definition of `SEG7_Full'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:45: first defined here
+./software/seg7.o: In function `SEG7_Number':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:51: multiple definition of `SEG7_Number'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:52: first defined here
+./software/seg7.o: In function `SEG7_All_Number':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:58: multiple definition of `SEG7_All_Number'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:60: first defined here
+./software/seg7.o: In function `SEG7_Hex':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:70: multiple definition of `SEG7_Hex'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:72: first defined here
+./software/seg7.o: In function `SEG7_Decimal':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:83: multiple definition of `SEG7_Decimal'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:89: first defined here
+collect2: error: ld returned 1 exit status
+make: *** [HexLEDsSW] Error 1
+15:28:36 **** Incremental Build of configuration Debug for project HexLEDsSW ****
+make all 
+Building target: HexLEDsSW
+Invoking: GCC C Linker
+arm-linux-gnueabihf-gcc  -o "HexLEDsSW"  ./software/HexLEDsSW/software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/HexLEDsSW/software/led.o ./software/HexLEDsSW/software/main.o ./software/HexLEDsSW/software/seg7.o  ./software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/led.o ./software/main.o ./software/seg7.o   -lpthread -lm -lrt
+./software/led.o: In function `LEDR_LightCount':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/led.c:16: multiple definition of `LEDR_LightCount'
+./software/HexLEDsSW/software/led.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/led.c:16: first defined here
+./software/led.o: In function `LEDR_OffCount':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/led.c:27: multiple definition of `LEDR_OffCount'
+./software/HexLEDsSW/software/led.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/led.c:27: first defined here
+./software/led.o: In function `LEDR_AllOn':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/led.c:37: multiple definition of `LEDR_AllOn'
+./software/HexLEDsSW/software/led.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/led.c:37: first defined here
+./software/led.o: In function `LEDR_AllOff':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/led.c:43: multiple definition of `LEDR_AllOff'
+./software/HexLEDsSW/software/led.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/led.c:43: first defined here
+./software/main.o: In function `led_blink':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:24: multiple definition of `h2p_lw_led_addr'
+./software/HexLEDsSW/software/main.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/main.c:30: first defined here
+./software/main.o: In function `led_blink':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:25: multiple definition of `h2p_lw_hex_addr'
+./software/HexLEDsSW/software/main.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/main.c:30: first defined here
+./software/main.o: In function `led_blink':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:24: multiple definition of `led_blink'
+./software/HexLEDsSW/software/main.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/main.c:30: first defined here
+./software/main.o: In function `main':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:56: multiple definition of `main'
+./software/HexLEDsSW/software/main.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/main.c:51: first defined here
+./software/seg7.o: In function `display_msg':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:28: multiple definition of `display_msg'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:30: first defined here
+./software/seg7.o: In function `SEG7_Clear':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:37: multiple definition of `SEG7_Clear'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:39: first defined here
+./software/seg7.o: In function `SEG7_Full':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:44: multiple definition of `SEG7_Full'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:45: first defined here
+./software/seg7.o: In function `SEG7_Number':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:51: multiple definition of `SEG7_Number'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:52: first defined here
+./software/seg7.o: In function `SEG7_All_Number':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:58: multiple definition of `SEG7_All_Number'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:60: first defined here
+./software/seg7.o: In function `SEG7_Hex':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:70: multiple definition of `SEG7_Hex'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:72: first defined here
+./software/seg7.o: In function `SEG7_Decimal':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/seg7.c:83: multiple definition of `SEG7_Decimal'
+./software/HexLEDsSW/software/seg7.o:/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/HexLEDsSW/software/seg7.c:89: first defined here
+collect2: error: ld returned 1 exit status
+make: *** [HexLEDsSW] Error 1
+15:32:08 **** Clean-only build of configuration Debug for project HexLEDsSW ****
+make clean 
+rm -rf  ./software/HexLEDsSW/software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/HexLEDsSW/software/led.o ./software/HexLEDsSW/software/main.o ./software/HexLEDsSW/software/seg7.o  ./software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/led.o ./software/main.o ./software/seg7.o   ./software/HexLEDsSW/software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.d  ./software/HexLEDsSW/software/led.d ./software/HexLEDsSW/software/main.d ./software/HexLEDsSW/software/seg7.d  ./software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.d  ./software/led.d ./software/main.d ./software/seg7.d   HexLEDsSW 
+ 
+15:32:10 **** Build of configuration Debug for project HexLEDsSW ****
+make all 
+Building file: ../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.d" -MT"software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.d" -o "software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o" "../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c"
+Finished building: ../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c
+ 
+Building file: ../software/led.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/led.d" -MT"software/led.d" -o "software/led.o" "../software/led.c"
+Finished building: ../software/led.c
+ 
+Building file: ../software/main.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/main.d" -MT"software/main.d" -o "software/main.o" "../software/main.c"
+Finished building: ../software/main.c
+ 
+Building file: ../software/seg7.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/seg7.d" -MT"software/seg7.d" -o "software/seg7.o" "../software/seg7.c"
+Finished building: ../software/seg7.c
+ 
+Building target: HexLEDsSW
+Invoking: GCC C Linker
+arm-linux-gnueabihf-gcc  -o "HexLEDsSW"  ./software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/led.o ./software/main.o ./software/seg7.o   -lpthread -lm -lrt
+Finished building target: HexLEDsSW
+ 

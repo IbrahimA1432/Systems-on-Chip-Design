@@ -1,0 +1,50 @@
+00:11:16 **** Build of configuration Debug for project HexLEDsSW ****
+make all 
+Building file: ../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.d" -MT"software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.d" -o "software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o" "../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c"
+Finished building: ../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c
+ 
+Building file: ../software/led.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/led.d" -MT"software/led.d" -o "software/led.o" "../software/led.c"
+../software/led.c:9:19: fatal error: hwlib.h: No such file or directory
+compilation terminated.
+make: *** [software/led.o] Error 1
+00:12:58 **** Incremental Build of configuration Debug for project HexLEDsSW ****
+make all 
+Building file: ../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.d" -MT"software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.d" -o "software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o" "../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c"
+Finished building: ../software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.c
+ 
+Building file: ../software/led.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/led.d" -MT"software/led.d" -o "software/led.o" "../software/led.c"
+Finished building: ../software/led.c
+ 
+Building file: ../software/main.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/main.d" -MT"software/main.d" -o "software/main.o" "../software/main.c"
+Finished building: ../software/main.c
+ 
+Building file: ../software/seg7.c
+Invoking: GCC C Compiler
+arm-linux-gnueabihf-gcc -I/usr/local/Quartus-EDS-14.0/embedded/ip/altera/hps/altera_hps/hwlib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"software/seg7.d" -MT"software/seg7.d" -o "software/seg7.o" "../software/seg7.c"
+Finished building: ../software/seg7.c
+ 
+Building target: HexLEDsSW
+Invoking: GCC C Linker
+arm-linux-gnueabihf-gcc  -o "HexLEDsSW"  ./software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/led.o ./software/main.o ./software/seg7.o   
+./software/main.o: In function `main':
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:81: undefined reference to `pthread_create'
+/home/student2/i49ali/coe838/lab3/software/HexLEDsSW/Debug/../software/main.c:94: undefined reference to `pthread_join'
+collect2: error: ld returned 1 exit status
+make: *** [HexLEDsSW] Error 1
+00:14:13 **** Incremental Build of configuration Debug for project HexLEDsSW ****
+make all 
+Building target: HexLEDsSW
+Invoking: GCC C Linker
+arm-linux-gnueabihf-gcc  -o "HexLEDsSW"  ./software/.metadata/.plugins/org.eclipse.cdt.make.core/specs.o  ./software/led.o ./software/main.o ./software/seg7.o   -lpthread -lm -lrt
+Finished building target: HexLEDsSW
+ 
