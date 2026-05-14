@@ -1,0 +1,56 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Quartus generated files
+db/
+incremental_db/
+output_files/
+simulation/
+greybox_tmp/
+*.qws
+*.qdf
+*.qdb
+*.rpt
+*.summary
+*.smsg
+*.pin
+*.sof
+*.pof
+*.jic
+*.cdf
+*.sld
+*.done
+*.chg
+*.bak
+
+# Keep project configuration only if you intentionally want to share it
+# *.qpf
+# *.qsf
+
+# ModelSim / Questa
+work/
+transcript
+vsim.wlf
+*.wlf
+*.mpf
+
+# C / C++ build outputs
+*.o
+*.out
+*.elf
+*.bin
+*.hex
+*.map
+*.exe
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
